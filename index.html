@@ -5,7 +5,7 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>PUSHUP AI</title>
+<title>PUSHUP AI - счётчик отжиманий</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
@@ -27,7 +27,6 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
     font-family: 'Inter', sans-serif;
     color: var(--text);
     -webkit-tap-highlight-color: transparent;
-    user-select: none;
   }
   #app {
     position: relative;
@@ -102,7 +101,7 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
     background: var(--panel);
     border: 1px solid var(--border); border-radius: 20px;
     padding: 18px 40px 14px;
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
     min-width: 200px;
     box-shadow: 0 0 30px rgba(0,255,136,0.07), 0 8px 32px rgba(0,0,0,0.5);
   }
@@ -140,7 +139,6 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
 
   /* RESET BUTTON */
   #btn-reset {
-    display: none;
     background: transparent;
     border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
     color: var(--muted); font-size: 0.65rem;
@@ -158,7 +156,7 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
   .info-card {
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 12px; padding: 10px 14px;
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); min-width: 80px;
+    backdrop-filter: blur(10px); min-width: 80px;
   }
   .info-card-label { font-size: 0.5rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
   .info-card-value { font-family: 'Orbitron', monospace; font-size: 1.1rem; font-weight: 700; color: var(--neon-green); }
@@ -173,7 +171,7 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
     text-shadow: 0 0 20px rgba(255,34,68,0.8);
     padding: 10px 20px;
     background: rgba(255,34,68,0.1); border: 1px solid rgba(255,34,68,0.3);
-    border-radius: 10px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border-radius: 10px; backdrop-filter: blur(8px);
     display: none; white-space: nowrap;
   }
   @keyframes warnPulse {
@@ -219,7 +217,6 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
     font-family: 'Orbitron', monospace; font-weight: 700; font-size: 0.9rem;
     letter-spacing: 0.2em; padding: 16px 44px; cursor: pointer; text-transform: uppercase;
     transition: all 0.2s; box-shadow: 0 0 20px rgba(0,255,136,0.15);
-    -webkit-tap-highlight-color: transparent;
   }
   #start-btn:active { transform: scale(0.97); box-shadow: 0 0 40px rgba(0,255,136,0.35); }
   #start-note { font-size: 0.65rem; color: rgba(232,234,240,0.25); text-align: center; letter-spacing: 0.05em; }
@@ -255,11 +252,11 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
       <span>powered by mediapipe</span>
     </div>
     <p id="start-desc">
-      ИИ считает отжимания в реальном времени.<br>
-      Встань боком к камере так, чтобы было видно всё тело.
+      🏋️ ИИ считает отжимания в реальном времени.<br>
+      📱 Встань боком к камере так, чтобы было видно всё тело.
     </p>
     <button id="start-btn">НАЧАТЬ</button>
-    <p id="start-note">Потребуется доступ к камере</p>
+    <p id="start-note">📷 Потребуется доступ к камере</p>
   </div>
 
   <!-- LOADING -->
@@ -281,7 +278,7 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
       <div id="dot"></div>
       <span id="status-text">ОЖИДАНИЕ</span>
     </div>
-    <button id="btn-reset">СБРОС</button>
+    <button id="btn-reset" style="display: none;">СБРОС</button>
   </div>
 
   <!-- LEFT PANELS -->
@@ -297,7 +294,7 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
   </div>
 
   <!-- WARNING -->
-  <div id="warning">ДЕРЖИ СПИНУ ПРЯМО!</div>
+  <div id="warning">⚠️ ДЕРЖИ СПИНУ ПРЯМО! ⚠️</div>
 
   <!-- NO POSE -->
   <div id="no-pose">
@@ -317,15 +314,11 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
 
 </div>
 
-<!-- ───────────────────────────────────────────────
-     ОБЫЧНЫЙ (не module) скрипт — виден глобально.
-     MediaPipe грузим через динамический import().
-──────────────────────────────────────────────── -->
 <script>
-(function () {
+(async function() {
   "use strict";
 
-  // ── DOM ──
+  // ── DOM элементы ──
   const elStartScreen = document.getElementById('start-screen');
   const elLoading     = document.getElementById('loading');
   const elVideo       = document.getElementById('video');
@@ -345,7 +338,7 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
 
   const ctx = elCanvas.getContext('2d');
 
-  // ── STATE ──
+  // ── Состояние приложения ──
   let poseLandmarker = null;
   let count       = 0;
   let stage       = 'idle';   // 'idle' | 'up' | 'down'
@@ -353,9 +346,12 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
   let smoothAngle = null;
   let noPoseFrames = 0;
   let lastVideoTime = -1;
+  let animationRunning = true;
+  let stream = null;
+  
   const NO_POSE_THRESHOLD = 25;
 
-  // ── GEOMETRY ──
+  // ── Геометрические функции ──
   function angle3pts(a, b, c) {
     const rad = Math.atan2(c.y - b.y, c.x - b.x)
               - Math.atan2(a.y - b.y, a.x - b.x);
@@ -363,25 +359,34 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
     if (deg > 180) deg = 360 - deg;
     return deg;
   }
-  function lerp(a, b, t) { return a + (b - a) * t; }
+  
+  function lerp(a, b, t) { 
+    return a + (b - a) * Math.min(0.95, Math.max(0.05, t)); 
+  }
 
-  // ── DRAW ──
+  // ── Отрисовка скелета ──
   const GREEN = '#00ff88';
   const BLUE  = '#00d4ff';
   const CONNECTIONS = [
-    [11,12],[11,13],[13,15],[12,14],[14,16],
-    [11,23],[12,24],[23,24],[23,25],[24,26],
-    [25,27],[26,28],[27,29],[28,30],[29,31],[30,32]
+    [11,12], [11,13], [13,15], [12,14], [14,16],
+    [11,23], [12,24], [23,24], [23,25], [24,26],
+    [25,27], [26,28], [27,29], [28,30], [29,31], [30,32]
   ];
+  
+  const POSE_POINTS = [11,12,13,14,15,16,23,24,25,26,27,28];
 
   function drawSkeleton(lm) {
+    if (!lm) return;
     const w = elCanvas.width, h = elCanvas.height;
-    ctx.shadowBlur  = 8;
+    
+    ctx.save();
+    ctx.shadowBlur = 6;
     ctx.shadowColor = GREEN;
     ctx.strokeStyle = GREEN;
-    ctx.lineWidth   = 2.5;
-    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.9;
 
+    // Рисуем соединения
     CONNECTIONS.forEach(([i, j]) => {
       if (lm[i] && lm[j] && lm[i].visibility > 0.3 && lm[j].visibility > 0.3) {
         ctx.beginPath();
@@ -391,25 +396,30 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
       }
     });
 
-    ctx.globalAlpha = 1;
-    [11,12,13,14,15,16,23,24,25,26,27,28].forEach(i => {
-      if (!lm[i] || lm[i].visibility < 0.3) return;
-      const x = lm[i].x * w, y = lm[i].y * h;
-      ctx.shadowBlur  = 14;
-      ctx.shadowColor = GREEN;
-      ctx.fillStyle   = GREEN;
-      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle  = '#ffffff';
-      ctx.shadowBlur = 0;
-      ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
+    // Рисуем ключевые точки
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = GREEN;
+    POSE_POINTS.forEach(i => {
+      if (lm[i] && lm[i].visibility > 0.3) {
+        const x = lm[i].x * w, y = lm[i].y * h;
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = GREEN;
+      }
     });
-
-    ctx.shadowBlur  = 0;
-    ctx.globalAlpha = 1;
+    
+    ctx.restore();
   }
 
   function drawElbowArc(lm, angle) {
-    if (angle === null) return;
+    if (angle === null || !lm) return;
     const w = elCanvas.width, h = elCanvas.height;
     const sh = lm[11], el = lm[13], wr = lm[15];
     if (!sh || !el || !wr || sh.visibility < 0.3 || el.visibility < 0.3) return;
@@ -419,37 +429,36 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
     const a2 = Math.atan2((wr.y - el.y) * h, (wr.x - el.x) * w);
     const color = angle < 90 ? BLUE : GREEN;
 
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(ex, ey, 28, a1, a2, false);
-    ctx.strokeStyle  = color;
-    ctx.shadowColor  = color;
-    ctx.shadowBlur   = 10;
-    ctx.lineWidth    = 2;
-    ctx.globalAlpha  = 0.75;
-    ctx.stroke();
-    ctx.globalAlpha  = 1;
-    ctx.shadowBlur   = 0;
-
-    // degree label
-    const mid = (a1 + a2) / 2;
-    const lx = ex + Math.cos(mid) * 44;
-    const ly = ey + Math.sin(mid) * 44;
-    ctx.font        = 'bold 11px Orbitron, monospace';
-    ctx.fillStyle   = color;
+    ctx.arc(ex, ey, 35, a1, a2, false);
+    ctx.strokeStyle = color;
     ctx.shadowColor = color;
-    ctx.shadowBlur  = 6;
-    ctx.fillText(Math.round(angle) + '\u00b0', lx - 12, ly + 4);
-    ctx.shadowBlur  = 0;
+    ctx.shadowBlur = 12;
+    ctx.lineWidth = 2.5;
+    ctx.globalAlpha = 0.8;
+    ctx.stroke();
+    
+    // Подпись угла
+    const mid = (a1 + a2) / 2;
+    const lx = ex + Math.cos(mid) * 50;
+    const ly = ey + Math.sin(mid) * 45;
+    ctx.font = 'bold 12px Orbitron, monospace';
+    ctx.fillStyle = color;
+    ctx.shadowBlur = 8;
+    ctx.fillText(Math.round(angle) + '°', lx - 15, ly + 5);
+    ctx.restore();
   }
 
-  // ── REP LOGIC ──
+  // ── Логика подсчёта отжиманий ──
   function triggerRep() {
     count++;
     streak++;
-    elCounter.textContent  = count;
+    elCounter.textContent = count;
     elStreakDis.textContent = streak;
     elBtnReset.style.display = 'block';
 
+    // Анимация
     elCounter.classList.remove('bump');
     void elCounter.offsetWidth;
     elCounter.classList.add('bump');
@@ -458,187 +467,260 @@ cat > /mnt/user-data/outputs/pushup-counter.html << 'HTMLEOF'
     void elCounterPanel.offsetWidth;
     elCounterPanel.classList.add('pulse');
 
-    if (navigator.vibrate) navigator.vibrate([40, 20, 40]);
+    // Вибрация
+    if (navigator.vibrate) navigator.vibrate(100);
   }
 
   function processLandmarks(lm) {
-    const sh  = lm[11], el = lm[13], wr = lm[15];
-    const hip = lm[23], kn = lm[25];
-    const vis = p => p && p.visibility > 0.4;
-
-    if (!vis(sh) || !vis(el) || !vis(wr)) {
-      noPoseFrames++;
-      return;
-    }
-    noPoseFrames = 0;
-
-    const raw = angle3pts(sh, el, wr);
-    smoothAngle = smoothAngle === null ? raw : lerp(smoothAngle, raw, 0.35);
-    const ang = smoothAngle;
-
-    // form check
-    let formOk = true;
-    if (vis(sh) && vis(hip) && vis(kn)) {
-      const hipAngle = angle3pts(sh, hip, kn);
-      formOk = hipAngle >= 155 && hipAngle <= 205;
-    }
-
-    // update panels
-    elAngleDis.textContent = Math.round(ang) + '\u00b0';
-    elAngleVal.textContent = Math.round(ang) + '\u00b0';
-
-    // state machine
-    if (ang < 90) {
-      if (stage !== 'down') {
-        stage = 'down';
-        elStage.textContent  = 'ВНИЗ \u2193';
-        elStage.className    = 'down';
-      }
-    } else if (ang > 160) {
-      if (stage === 'down') {
-        if (formOk) triggerRep();
-        // even if form is bad, reset stage so it doesn't keep firing
-        stage = 'up';
-        elStage.textContent = 'ВВЕРХ \u2191';
-        elStage.className   = '';
-      } else if (stage === 'idle') {
-        stage = 'up';
-        elStage.textContent = 'ВВЕРХ \u2191';
-        elStage.className   = '';
-      }
-    }
-
-    // warning
-    if (!formOk && stage !== 'idle') {
-      elWarning.classList.add('visible');
-    } else {
-      elWarning.classList.remove('visible');
-    }
-  }
-
-  // ── DETECTION LOOP ──
-  function detectLoop() {
-    requestAnimationFrame(detectLoop);
-
-    if (elVideo.readyState < 2 || !poseLandmarker) return;
-
-    // sync canvas to video resolution
-    if (elCanvas.width  !== elVideo.videoWidth)  elCanvas.width  = elVideo.videoWidth;
-    if (elCanvas.height !== elVideo.videoHeight) elCanvas.height = elVideo.videoHeight;
-
-    const now = performance.now();
-    if (elVideo.currentTime === lastVideoTime) return;
-    lastVideoTime = elVideo.currentTime;
-
-    let results;
-    try { results = poseLandmarker.detectForVideo(elVideo, now); } catch (e) { return; }
-
-    ctx.clearRect(0, 0, elCanvas.width, elCanvas.height);
-
-    if (results && results.landmarks && results.landmarks.length > 0) {
-      const lm = results.landmarks[0];
-      noPoseFrames = 0;
-
-      processLandmarks(lm);
-      drawSkeleton(lm);
-      drawElbowArc(lm, smoothAngle);
-
-      elNoPose.classList.remove('visible');
-      elDot.className       = 'active';
-      elStatusText.textContent = 'AI ACTIVE';
-    } else {
+    const sh = lm[11], el = lm[13], wr = lm[15];
+    const hip = lm[23], knee = lm[25];
+    
+    const isValid = (p) => p && p.visibility > 0.4;
+    
+    if (!isValid(sh) || !isValid(el) || !isValid(wr)) {
       noPoseFrames++;
       if (noPoseFrames > NO_POSE_THRESHOLD) {
-        elNoPose.classList.add('visible');
-        elWarning.classList.remove('visible');
-        elDot.className          = '';
-        elStatusText.textContent = 'ОЖИДАНИЕ';
+        smoothAngle = null;
+      }
+      return false;
+    }
+    
+    noPoseFrames = 0;
+    
+    // Вычисляем угол в локте
+    const rawAngle = angle3pts(sh, el, wr);
+    smoothAngle = smoothAngle === null ? rawAngle : lerp(smoothAngle, rawAngle, 0.3);
+    const angle = smoothAngle;
+    
+    // Обновляем отображение угла
+    const angleRound = Math.round(angle);
+    elAngleDis.textContent = angleRound + '°';
+    elAngleVal.textContent = angleRound + '°';
+    
+    // Проверка формы (прямая спина)
+    let formOk = true;
+    if (isValid(sh) && isValid(hip) && isValid(knee)) {
+      const backAngle = angle3pts(sh, hip, knee);
+      formOk = backAngle >= 150 && backAngle <= 210;
+    }
+    
+    // Машина состояний
+    if (angle < 90) {
+      if (stage !== 'down') {
+        stage = 'down';
+        elStage.textContent = 'ВНИЗ ↓';
+        elStage.className = 'down';
+      }
+    } else if (angle > 155) {
+      if (stage === 'down') {
+        if (formOk) {
+          triggerRep();
+        } else if (!elWarning.classList.contains('visible')) {
+          elWarning.classList.add('visible');
+          setTimeout(() => elWarning.classList.remove('visible'), 800);
+        }
+        stage = 'up';
+        elStage.textContent = 'ВВЕРХ ↑';
+        elStage.className = '';
+      } else if (stage === 'idle') {
+        stage = 'up';
+        elStage.textContent = 'ВВЕРХ ↑';
+        elStage.className = '';
+      }
+    }
+    
+    // Предупреждение о спине
+    if (!formOk && stage !== 'idle') {
+      elWarning.classList.add('visible');
+    } else if (formOk) {
+      elWarning.classList.remove('visible');
+    }
+    
+    return true;
+  }
+
+  // ── Цикл детекции ──
+  async function detectLoop() {
+    if (!animationRunning) return;
+    
+    requestAnimationFrame(detectLoop);
+    
+    if (elVideo.readyState < 2 || !poseLandmarker || elVideo.paused) return;
+    
+    // Синхронизация размера canvas
+    if (elCanvas.width !== elVideo.videoWidth || elCanvas.height !== elVideo.videoHeight) {
+      elCanvas.width = elVideo.videoWidth || 640;
+      elCanvas.height = elVideo.videoHeight || 480;
+    }
+    
+    const now = performance.now();
+    if (Math.abs(elVideo.currentTime - lastVideoTime) < 0.033) return;
+    lastVideoTime = elVideo.currentTime;
+    
+    let results;
+    try {
+      results = poseLandmarker.detectForVideo(elVideo, now);
+    } catch (error) {
+      console.warn('Detection error:', error);
+      return;
+    }
+    
+    // Очистка canvas
+    ctx.clearRect(0, 0, elCanvas.width, elCanvas.height);
+    
+    if (results && results.landmarks && results.landmarks.length > 0) {
+      const landmarks = results.landmarks[0];
+      const hasPose = processLandmarks(landmarks);
+      
+      if (hasPose) {
+        drawSkeleton(landmarks);
+        drawElbowArc(landmarks, smoothAngle);
+        elNoPose.classList.remove('visible');
+        elDot.className = 'active';
+        elStatusText.textContent = 'AI ACTIVE';
+      } else {
+        handleNoPose();
+      }
+    } else {
+      handleNoPose();
+    }
+  }
+  
+  function handleNoPose() {
+    noPoseFrames++;
+    if (noPoseFrames > NO_POSE_THRESHOLD) {
+      elNoPose.classList.add('visible');
+      elWarning.classList.remove('visible');
+      elDot.className = '';
+      elStatusText.textContent = 'НЕТ СИГНАЛА';
+      if (noPoseFrames > NO_POSE_THRESHOLD + 30) {
         smoothAngle = null;
       }
     }
   }
 
-  // ── RESET ──
+  // ── Сброс счётчика ──
   function resetCounter() {
-    count = 0; stage = 'idle'; streak = 0; smoothAngle = null;
-    elCounter.textContent   = '0';
-    elStreakDis.textContent  = '0';
-    elAngleDis.textContent   = '\u2014';
-    elAngleVal.textContent   = '';
-    elStage.textContent      = 'ГОТОВ';
-    elStage.className        = 'idle';
+    count = 0;
+    stage = 'idle';
+    streak = 0;
+    smoothAngle = null;
+    noPoseFrames = 0;
+    
+    elCounter.textContent = '0';
+    elStreakDis.textContent = '0';
+    elAngleDis.textContent = '—';
+    elAngleVal.textContent = '';
+    elStage.textContent = 'ГОТОВ';
+    elStage.className = 'idle';
     elBtnReset.style.display = 'none';
     elWarning.classList.remove('visible');
+    
+    // Визуальная обратная связь
+    if (navigator.vibrate) navigator.vibrate(50);
   }
 
-  // ── START APP ──
-  async function startApp() {
-    elStartScreen.style.display = 'none';
-    elLoading.style.display     = 'flex';
-    elStatusText.textContent    = 'КАМЕРА…';
+  // ── Остановка камеры и очистка ──
+  async function cleanup() {
+    animationRunning = false;
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+    if (poseLandmarker) {
+      poseLandmarker.close();
+      poseLandmarker = null;
+    }
+    elVideo.srcObject = null;
+  }
 
+  // ── Запуск приложения ──
+  async function startApp() {
+    await cleanup();
+    
+    elStartScreen.style.display = 'none';
+    elLoading.style.display = 'flex';
+    elStatusText.textContent = 'ЗАПУСК...';
+    
     try {
-      // 1. Camera
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, max: 60 } },
+      // 1. Запрос камеры
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        },
         audio: false
       });
+      
       elVideo.srcObject = stream;
-      await new Promise((resolve, reject) => {
-        elVideo.onloadedmetadata = () => elVideo.play().then(resolve).catch(reject);
-        elVideo.onerror = reject;
-        setTimeout(reject, 8000); // safety timeout
-      });
-
-      elStatusText.textContent = 'ЗАГРУЗКА ИИ…';
-
-      // 2. Load MediaPipe via dynamic import
-      const { PoseLandmarker, FilesetResolver } = await import(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js"
+      await elVideo.play();
+      
+      elStatusText.textContent = 'ЗАГРУЗКА AI...';
+      
+      // 2. Загрузка MediaPipe Vision
+      const visionModule = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js');
+      const { PoseLandmarker, FilesetResolver } = visionModule;
+      
+      const filesetResolver = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
       );
-
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-      );
-
-      poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+      
+      poseLandmarker = await PoseLandmarker.createFromOptions(filesetResolver, {
         baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
-          delegate: "GPU"
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+          delegate: 'GPU'
         },
-        runningMode: "VIDEO",
+        runningMode: 'VIDEO',
         numPoses: 1,
         minPoseDetectionConfidence: 0.5,
-        minPosePresenceConfidence:  0.5,
-        minTrackingConfidence:      0.5
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
       });
-
-      // 3. Go
-      elLoading.style.display  = 'none';
-      elDot.className          = 'active';
+      
+      // 3. Запуск детекции
+      animationRunning = true;
+      elLoading.style.display = 'none';
+      elDot.className = 'active';
       elStatusText.textContent = 'AI ACTIVE';
+      
       detectLoop();
-
-    } catch (err) {
-      console.error('startApp error:', err);
-      elLoading.style.display  = 'none';
-      elDot.className          = 'error';
+      
+    } catch (error) {
+      console.error('Startup error:', error);
+      elLoading.style.display = 'none';
+      elStartScreen.style.display = 'flex';
+      elDot.className = 'error';
       elStatusText.textContent = 'ОШИБКА';
-      elNoPose.querySelector('.np-icon').textContent = '📵';
-      elNoPose.querySelector('.np-text').textContent =
-        'Нет доступа к камере.\nПроверь разрешения браузера.';
-      elNoPose.classList.add('visible');
+      
+      let errorMsg = 'Не удалось запустить камеру.\n';
+      if (error.name === 'NotAllowedError') {
+        errorMsg = 'Нет доступа к камере.\nРазрешите доступ в настройках браузера.';
+      } else if (error.name === 'NotFoundError') {
+        errorMsg = 'Камера не найдена.\nПроверьте подключение веб-камеры.';
+      } else {
+        errorMsg += error.message || 'Попробуйте обновить страницу.';
+      }
+      
+      const noPoseDiv = document.querySelector('#no-pose .np-text');
+      if (noPoseDiv) {
+        noPoseDiv.textContent = errorMsg;
+        elNoPose.classList.add('visible');
+      }
     }
   }
 
-  // ── WIRE BUTTONS ──
+  // ── Обработчики событий ──
   elBtnStart.addEventListener('click', startApp);
   elBtnReset.addEventListener('click', resetCounter);
-
+  
+  // Предзагрузка для плавного старта
+  console.log('PUSHUP AI - готов к работе!');
 })();
 </script>
 </body>
 </html>
 HTMLEOF
-echo "Done: $?"
-Output
+
+echo "✅ Файл успешно создан: /mnt/user-data/outputs/pushup-counter.html"
