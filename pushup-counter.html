@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>PUSHUP AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --neon-green: #00ff88;
+    --neon-red: #ff2244;
+    --neon-blue: #00d4ff;
+    --bg: #07070d;
+    --panel: rgba(10, 12, 24, 0.82);
+    --border: rgba(0, 255, 136, 0.18);
+    --text: #e8eaf0;
+    --muted: rgba(232,234,240,0.45);
+  }
+
+  html, body {
+    height: 100%; width: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  #app {
+    position: relative;
+    width: 100vw; height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── VIDEO + CANVAS ── */
+  #media-wrap {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  #video {
+    position: absolute;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+  }
+
+  #canvas {
+    position: absolute;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    pointer-events: none;
+  }
+
+  /* scanline overlay */
+  #media-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.06) 2px,
+      rgba(0,0,0,0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* vignette */
+  #media-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.65) 100%);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* ── TOP BAR ── */
+  #top-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px 10px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%);
+  }
+
+  #logo {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 1rem;
+    letter-spacing: 0.25em;
+    color: var(--neon-green);
+    text-shadow: 0 0 12px rgba(0,255,136,0.6);
+  }
+
+  #status-dot {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  #dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #444;
+    transition: background 0.4s, box-shadow 0.4s;
+  }
+  #dot.active { background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); }
+  #dot.error  { background: var(--neon-red);   box-shadow: 0 0 8px var(--neon-red); }
+
+  /* ── COUNTER PANEL ── */
+  #counter-panel {
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 18px 40px 14px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    min-width: 200px;
+    box-shadow: 0 0 30px rgba(0,255,136,0.07), 0 8px 32px rgba(0,0,0,0.5);
+    transition: box-shadow 0.15s;
+  }
+
+  #counter-panel.pulse {
+    box-shadow: 0 0 40px rgba(0,255,136,0.45), 0 8px 32px rgba(0,0,0,0.5);
+    animation: panelPulse 0.5s ease-out;
+  }
+
+  @keyframes panelPulse {
+    0%   { box-shadow: 0 0 60px rgba(0,255,136,0.7), 0 8px 32px rgba(0,0,0,0.5); }
+    100% { box-shadow: 0 0 30px rgba(0,255,136,0.07), 0 8px 32px rgba(0,0,0,0.5); }
+  }
+
+  #counter-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  #counter {
+    font-family: 'Orbitron', monospace;
+    font-size: 4.5rem;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--neon-green);
+    text-shadow: 0 0 20px rgba(0,255,136,0.5);
+    transition: transform 0.15s cubic-bezier(.17,.67,.45,1.6);
+  }
+
+  #counter.bump {
+    animation: counterBump 0.35s cubic-bezier(.17,.67,.45,1.6);
+  }
+
+  @keyframes counterBump {
+    0%  { transform: scale(1); }
+    40% { transform: scale(1.32); text-shadow: 0 0 40px rgba(0,255,136,0.9); }
+    100% { transform: scale(1); }
+  }
+
+  #stage-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+  }
+
+  #stage-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 50px;
+    border: 1px solid var(--neon-green);
+    color: var(--neon-green);
+    background: rgba(0,255,136,0.08);
+    transition: all 0.2s;
+  }
+  #stage-badge.down {
+    border-color: var(--neon-blue);
+    color: var(--neon-blue);
+    background: rgba(0,212,255,0.08);
+  }
+  #stage-badge.idle {
+    border-color: rgba(255,255,255,0.15);
+    color: var(--muted);
+    background: transparent;
+  }
+
+  #angle-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  /* ── RESET BUTTON ── */
+  #reset-btn {
+    position: absolute;
+    top: 14px; right: 18px;
+    /* hidden, re-positioned to after logo */
+    display: none;
+  }
+
+  #btn-reset {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 0.65rem;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  #btn-reset:hover { border-color: var(--neon-red); color: var(--neon-red); }
+
+  /* ── INFO PANELS (left side) ── */
+  #left-panels {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .info-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    min-width: 80px;
+  }
+  .info-card-label {
+    font-size: 0.5rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+  .info-card-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--neon-green);
+  }
+
+  /* ── WARNING OVERLAY ── */
+  #warning {
+    position: absolute;
+    top: 38%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: clamp(0.9rem, 4vw, 1.3rem);
+    letter-spacing: 0.08em;
+    text-align: center;
+    color: var(--neon-red);
+    text-shadow: 0 0 20px rgba(255,34,68,0.8);
+    padding: 10px 20px;
+    background: rgba(255,34,68,0.1);
+    border: 1px solid rgba(255,34,68,0.3);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    white-space: nowrap;
+    animation: warnPulse 0.8s ease-in-out infinite alternate;
+  }
+  @keyframes warnPulse {
+    from { text-shadow: 0 0 10px rgba(255,34,68,0.6); }
+    to   { text-shadow: 0 0 30px rgba(255,34,68,1); }
+  }
+
+  /* ── NO POSE OVERLAY ── */
+  #no-pose {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 25;
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+  #no-pose .np-icon {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    opacity: 0.6;
+  }
+  #no-pose .np-text {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── START SCREEN ── */
+  #start-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    background: radial-gradient(ellipse at 50% 30%, rgba(0,255,136,0.06) 0%, var(--bg) 70%);
+    padding: 30px;
+  }
+
+  #start-logo {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: clamp(2rem, 8vw, 3.5rem);
+    letter-spacing: 0.2em;
+    color: var(--neon-green);
+    text-shadow: 0 0 40px rgba(0,255,136,0.5);
+    text-align: center;
+  }
+  #start-logo span {
+    display: block;
+    font-size: 0.35em;
+    letter-spacing: 0.5em;
+    color: var(--muted);
+    margin-top: 4px;
+    text-shadow: none;
+  }
+
+  #start-desc {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.7;
+    max-width: 300px;
+  }
+
+  #start-btn {
+    margin-top: 10px;
+    background: linear-gradient(135deg, rgba(0,255,136,0.15), rgba(0,255,136,0.06));
+    border: 1.5px solid var(--neon-green);
+    border-radius: 50px;
+    color: var(--neon-green);
+    font-family: 'Orbitron', monospace;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
+    padding: 16px 44px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(0,255,136,0.15);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #start-btn:active {
+    transform: scale(0.97);
+    box-shadow: 0 0 40px rgba(0,255,136,0.35);
+  }
+
+  #start-note {
+    font-size: 0.65rem;
+    color: rgba(232,234,240,0.25);
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── LOADING ── */
+  #loading {
+    position: absolute;
+    inset: 0;
+    z-index: 45;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: var(--bg);
+  }
+  #loading-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    color: var(--neon-green);
+    text-transform: uppercase;
+  }
+  #loading-bar-wrap {
+    width: 180px;
+    height: 2px;
+    background: rgba(0,255,136,0.15);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #loading-bar {
+    height: 100%;
+    background: var(--neon-green);
+    box-shadow: 0 0 8px var(--neon-green);
+    animation: loadScan 1.2s ease-in-out infinite;
+  }
+  @keyframes loadScan {
+    0%   { width: 0%; margin-left: 0%; }
+    50%  { width: 60%; margin-left: 20%; }
+    100% { width: 0%; margin-left: 100%; }
+  }
+
+  /* mobile tweaks */
+  @media (max-width: 400px) {
+    #counter { font-size: 3.5rem; }
+    #counter-panel { padding: 14px 28px 10px; min-width: 170px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- START SCREEN -->
+  <div id="start-screen">
+    <div id="start-logo">
+      PUSH<br>UP.AI
+      <span>powered by mediapipe</span>
+    </div>
+    <p id="start-desc">
+      ИИ считает отжимания в реальном времени.<br>
+      Встань боком к камере так, чтобы было видно всё тело.
+    </p>
+    <button id="start-btn" onclick="startApp()">НАЧАТЬ</button>
+    <p id="start-note">Потребуется доступ к камере</p>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loading">
+    <div id="loading-text">Загрузка ИИ</div>
+    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+  </div>
+
+  <!-- VIDEO + CANVAS -->
+  <div id="media-wrap">
+    <video id="video" autoplay playsinline muted loop></video>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- TOP BAR -->
+  <div id="top-bar">
+    <div id="logo">PUSH<span style="color:rgba(0,255,136,0.4)">.</span>AI</div>
+    <div id="status-dot">
+      <div id="dot"></div>
+      <span id="status-text">ОЖИДАНИЕ</span>
+    </div>
+    <button id="btn-reset" onclick="resetCounter()">СБРОС</button>
+  </div>
+
+  <!-- LEFT PANELS -->
+  <div id="left-panels">
+    <div class="info-card">
+      <div class="info-card-label">Угол</div>
+      <div class="info-card-value" id="angle-display">—</div>
+    </div>
+    <div class="info-card">
+      <div class="info-card-label">Серия</div>
+      <div class="info-card-value" id="streak-display">0</div>
+    </div>
+  </div>
+
+  <!-- WARNING -->
+  <div id="warning">ДЕРЖИ СПИНУ ПРЯМО!</div>
+
+  <!-- NO POSE -->
+  <div id="no-pose">
+    <div class="np-icon">🕵️</div>
+    <div class="np-text">Встань так, чтобы<br>тебя было видно полностью</div>
+  </div>
+
+  <!-- COUNTER PANEL -->
+  <div id="counter-panel">
+    <div id="counter-label">ОТЖИМАНИЯ</div>
+    <div id="counter">0</div>
+    <div id="stage-row">
+      <div id="stage-badge" class="idle">ГОТОВ</div>
+      <div id="angle-val"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MediaPipe via CDN (Tasks Vision) -->
+<script type="module">
+import {
+  PoseLandmarker,
+  FilesetResolver,
+  DrawingUtils
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js";
+
+// ── STATE ──
+let poseLandmarker = null;
+let animFrameId = null;
+let count = 0;
+let stage = 'idle'; // 'up' | 'down' | 'idle'
+let streak = 0;
+let poseVisible = false;
+let lastLandmarks = null;
+let smoothAngle = null;
+let formWarningActive = false;
+let noPoseFrames = 0;
+const NO_POSE_THRESHOLD = 20;
+
+// DOM refs
+const video      = document.getElementById('video');
+const canvas     = document.getElementById('canvas');
+const ctx        = canvas.getContext('2d');
+const elCounter  = document.getElementById('counter');
+const elStage    = document.getElementById('stage-badge');
+const elAngleVal = document.getElementById('angle-val');
+const elAngleDis = document.getElementById('angle-display');
+const elStreak   = document.getElementById('streak-display');
+const elWarning  = document.getElementById('warning');
+const elNoPose   = document.getElementById('no-pose');
+const elDot      = document.getElementById('dot');
+const elStatus   = document.getElementById('status-text');
+const elPanel    = document.getElementById('counter-panel');
+const elLoading  = document.getElementById('loading');
+const elResetBtn = document.getElementById('btn-reset');
+
+// ── GEOMETRY HELPERS ──
+function angle3pts(a, b, c) {
+  const radians = Math.atan2(c.y - b.y, c.x - b.x)
+                - Math.atan2(a.y - b.y, a.x - b.x);
+  let deg = Math.abs(radians * 180 / Math.PI);
+  if (deg > 180) deg = 360 - deg;
+  return deg;
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+// ── DRAW NEON SKELETON ──
+const GREEN  = '#00ff88';
+const RED    = '#ff2244';
+const BLUE   = '#00d4ff';
+const DIM    = 'rgba(0,255,136,0.25)';
+
+const POSE_CONNECTIONS = [
+  [11,12],[11,13],[13,15],[12,14],[14,16],
+  [11,23],[12,24],[23,24],[23,25],[24,26],
+  [25,27],[26,28],[27,29],[28,30],[29,31],[30,32]
+];
+
+function drawSkeleton(lm, color, formOk) {
+  const w = canvas.width, h = canvas.height;
+
+  // connections
+  ctx.lineWidth = 2.5;
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = color;
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.85;
+
+  POSE_CONNECTIONS.forEach(([i, j]) => {
+    if (lm[i] && lm[j] && lm[i].visibility > 0.3 && lm[j].visibility > 0.3) {
+      ctx.beginPath();
+      ctx.moveTo(lm[i].x * w, lm[i].y * h);
+      ctx.lineTo(lm[j].x * w, lm[j].y * h);
+      ctx.stroke();
+    }
+  });
+
+  // joints
+  const keyPts = [11,12,13,14,15,16,23,24,25,26,27,28];
+  keyPts.forEach(i => {
+    if (!lm[i] || lm[i].visibility < 0.3) return;
+    const x = lm[i].x * w, y = lm[i].y * h;
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = color;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // white center
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+}
+
+function drawElbowArc(lm, angle) {
+  const w = canvas.width, h = canvas.height;
+  const shoulder = lm[11], elbow = lm[13], wrist = lm[15];
+  if (!shoulder || !elbow || !wrist) return;
+  if (shoulder.visibility < 0.3 || elbow.visibility < 0.3) return;
+
+  const ex = elbow.x * w, ey = elbow.y * h;
+  const r = 30;
+  const a1 = Math.atan2((shoulder.y - elbow.y) * h, (shoulder.x - elbow.x) * w);
+  const a2 = Math.atan2((wrist.y - elbow.y) * h, (wrist.x - elbow.x) * w);
+
+  const color = angle < 90 ? BLUE : GREEN;
+  ctx.beginPath();
+  ctx.arc(ex, ey, r, a1, a2, false);
+  ctx.strokeStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 10;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.7;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+
+  // angle label
+  const mid = (a1 + a2) / 2;
+  const lx = ex + Math.cos(mid) * (r + 16);
+  const ly = ey + Math.sin(mid) * (r + 16);
+  ctx.font = 'bold 11px Orbitron, monospace';
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 6;
+  ctx.fillText(`${Math.round(angle)}°`, lx - 12, ly + 4);
+  ctx.shadowBlur = 0;
+}
+
+// ── COUNTER LOGIC ──
+function onRep() {
+  count++;
+  streak++;
+  elCounter.textContent = count;
+  elStreak.textContent = streak;
+  elResetBtn.style.display = 'block';
+
+  // bump animation
+  elCounter.classList.remove('bump');
+  void elCounter.offsetWidth;
+  elCounter.classList.add('bump');
+
+  // panel pulse
+  elPanel.classList.remove('pulse');
+  void elPanel.offsetWidth;
+  elPanel.classList.add('pulse');
+
+  // vibrate
+  if (navigator.vibrate) navigator.vibrate([40, 20, 40]);
+}
+
+function resetCounter() {
+  count = 0; stage = 'idle'; streak = 0;
+  elCounter.textContent = '0';
+  elStreak.textContent = '0';
+  elStage.textContent = 'ГОТОВ';
+  elStage.className = 'idle';
+  elAngleVal.textContent = '';
+  elAngleDis.textContent = '—';
+  elResetBtn.style.display = 'none';
+}
+window.resetCounter = resetCounter;
+
+// ── PROCESS LANDMARKS ──
+function processLandmarks(lm) {
+  // Elbow angle (left side: 11=shoulder, 13=elbow, 15=wrist)
+  const sh = lm[11], el = lm[13], wr = lm[15];
+  const hip = lm[23], knee = lm[25];
+
+  const vis = (p) => p && p.visibility > 0.4;
+  if (!vis(sh) || !vis(el) || !vis(wr)) {
+    noPoseFrames++;
+    return false;
+  }
+  noPoseFrames = 0;
+
+  const rawAngle = angle3pts(sh, el, wr);
+  smoothAngle = smoothAngle === null ? rawAngle : lerp(smoothAngle, rawAngle, 0.35);
+  const ang = smoothAngle;
+
+  // form check (hip alignment: shoulder 11, hip 23, knee 25)
+  let formOk = true;
+  if (vis(sh) && vis(hip) && vis(knee)) {
+    const hipAngle = angle3pts(sh, hip, knee);
+    formOk = hipAngle >= 160 && hipAngle <= 200;
+  }
+
+  // update UI
+  elAngleDis.textContent = `${Math.round(ang)}°`;
+  elAngleVal.textContent = `${Math.round(ang)}°`;
+
+  // stage machine
+  if (ang < 90) {
+    stage = 'down';
+    elStage.textContent = 'ВНИЗ ↓';
+    elStage.className = 'down';
+  } else if (ang > 160 && stage === 'down') {
+    if (formOk) {
+      onRep();
+    }
+    stage = 'up';
+    elStage.textContent = 'ВВЕРХ ↑';
+    elStage.className = '';
+  } else if (ang > 160 && stage === 'idle') {
+    stage = 'up';
+    elStage.textContent = 'ВВЕРХ ↑';
+    elStage.className = '';
+  }
+
+  // form warning
+  if (!formOk && (stage === 'down' || stage === 'up')) {
+    elWarning.style.display = 'block';
+    formWarningActive = true;
+  } else {
+    elWarning.style.display = 'none';
+    formWarningActive = false;
+  }
+
+  return formOk;
+}
+
+// ── DETECTION LOOP ──
+let lastVideoTime = -1;
+
+function detectLoop() {
+  if (video.readyState < 2) {
+    animFrameId = requestAnimationFrame(detectLoop);
+    return;
+  }
+
+  // sync canvas to video intrinsic size
+  if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+  }
+
+  const now = performance.now();
+  if (video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime;
+
+    if (poseLandmarker) {
+      let results;
+      try { results = poseLandmarker.detectForVideo(video, now); } catch(e) {}
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (results && results.landmarks && results.landmarks.length > 0) {
+        const lm = results.landmarks[0];
+        lastLandmarks = lm;
+        poseVisible = true;
+        noPoseFrames = 0;
+
+        const formOk = processLandmarks(lm);
+        drawSkeleton(lm, GREEN, formOk);
+        drawElbowArc(lm, smoothAngle ?? 0);
+
+        elNoPose.style.opacity = '0';
+        elDot.className = 'active';
+        elStatus.textContent = 'AI ACTIVE';
+      } else {
+        noPoseFrames++;
+        if (noPoseFrames > NO_POSE_THRESHOLD) {
+          poseVisible = false;
+          elNoPose.style.opacity = '1';
+          elWarning.style.display = 'none';
+          elDot.className = '';
+          elStatus.textContent = 'ОЖИДАНИЕ';
+          smoothAngle = null;
+        }
+      }
+    }
+  }
+
+  animFrameId = requestAnimationFrame(detectLoop);
+}
+
+// ── INIT ──
+async function startApp() {
+  document.getElementById('start-screen').style.display = 'none';
+  elLoading.style.display = 'flex';
+
+  try {
+    // 1. Camera first
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'user',
+        width:  { ideal: 640 },
+        height: { ideal: 480 },
+        frameRate: { ideal: 30, max: 60 }
+      },
+      audio: false
+    });
+    video.srcObject = stream;
+
+    await new Promise((res) => {
+      video.onloadedmetadata = () => { video.play(); res(); };
+    });
+
+    elDot.className = '';
+    elStatus.textContent = 'ЗАГРУЗКА ИИ';
+
+    // 2. Then load model
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+    );
+
+    poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+        delegate: "GPU"
+      },
+      runningMode: "VIDEO",
+      numPoses: 1,
+      minPoseDetectionConfidence: 0.55,
+      minPosePresenceConfidence: 0.55,
+      minTrackingConfidence: 0.55
+    });
+
+    elLoading.style.display = 'none';
+    elDot.className = 'active';
+    elStatus.textContent = 'AI ACTIVE';
+    elResetBtn.style.display = 'none';
+
+    // 3. Start loop
+    detectLoop();
+
+  } catch (err) {
+    elLoading.style.display = 'none';
+    elDot.className = 'error';
+    elStatus.textContent = 'ОШИБКА';
+    elNoPose.style.opacity = '1';
+    elNoPose.querySelector('.np-icon').textContent = '📵';
+    elNoPose.querySelector('.np-text').textContent =
+      'Нет доступа к камере.\nПроверь разрешения браузера.';
+    console.error('Init error:', err);
+  }
+}
+
+window.startApp = startApp;
+</script>
+</body>
+</html>
