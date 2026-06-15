@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ИИ Счетчик Отжиманий</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        h1 { margin-bottom: 10px; color: #00ff88; }
+        .container { position: relative; width: 640px; height: 480px; }
+        /* Видео скрываем, а выводим всё на Canvas (холст) */
+        video { display: none; }
+        canvas {
+            border: 4px solid #333;
+            border-radius: 10px;
+            background-color: #1a1a1a;
+            transform: scaleX(-1); /* Зеркальное отображение для удобства */
+        }
+        .scoreboard {
+            margin-top: 20px;
+            display: flex;
+            gap: 30px;
+            background: #1e1e1e;
+            padding: 15px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .stat { text-align: center; }
+        .stat-val { font-size: 2.5rem; font-weight: bold; color: #00ff88; }
+        .stat-lbl { font-size: 0.9rem; color: #aaa; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+    <h1>ИИ Счетчик Отжиманий</h1>
+    <p>Встань боком к камере, чтобы ИИ видел твоё плечо, локоть и запястье</p>
+
+    <div class="container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="output_canvas" width="640" height="480"></canvas>
+    </div>
+
+    <div class="scoreboard">
+        <div class="stat">
+            <div id="counter" class="stat-val">0</div>
+            <div class="stat-lbl">Повторения</div>
+        </div>
+        <div class="stat">
+            <div id="stage" class="stat-val">---</div>
+            <div class="stat-lbl">Стадия</div>
+        </div>
+        <div class="stat">
+            <div id="angleDisplay" class="stat-val">0°</div>
+            <div class="stat-lbl">Угол в локте</div>
+        </div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+
+        const counterDiv = document.getElementById('counter');
+        const stageDiv = document.getElementById('stage');
+        const angleDiv = document.getElementById('angleDisplay');
+
+        // Переменные для логики упражнения
+        let count = 0;
+        let stage = "up"; // "up" - руки прямые, "down" - отжался (руки согнуты)
+
+        // Функция для расчета угла между тремя точками (A, B, C), где B - вершина угла (локоть)
+        function calculateAngle(A, B, C) {
+            let radians = Math.atan2(C.y - B.y, C.x - B.x) - Math.atan2(A.y - B.y, A.x - B.x);
+            let angle = Math.abs((radians * 180.0) / Math.PI);
+            
+            if (angle > 180.0) {
+                angle = 360.0 - angle;
+            }
+            return Math.round(angle);
+        }
+
+        // Функция обработки кадров от нейросети
+        function onResults(results) {
+            // Очищаем холст и рисуем текущий кадр из видео
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            // Если нейросеть нашла точки тела
+            if (results.poseLandmarks) {
+                
+                // Рисуем скелет поверх видео
+                drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTORS, {color: '#00FF00', lineWidth: 4});
+                drawLandmarks(canvasCtx, results.poseLandmarks, {color: '#FF0000', lineWidth: 2, radius: 5});
+
+                // Достаем нужные точки (будем использовать левую сторону тела)
+                // Если будешь стоять другим боком, можно переключить на 12, 14, 16 (правая сторона)
+                const shoulder = results.poseLandmarks[11]; // Плечо
+                const elbow = results.poseLandmarks[13];    // Локоть
+                const wrist = results.poseLandmarks[15];    // Запястье
+
+                // Считаем угол в локте
+                const angle = calculateAngle(shoulder, elbow, wrist);
+                angleDiv.innerText = angle + "°";
+
+                // Логика счетчика отжиманий
+                if (angle > 160) {
+                    stage = "up";
+                    stageDiv.innerText = "Вверху";
+                    stageDiv.style.color = "#00ff88";
+                }
+                if (angle < 90 && stage === "up") {
+                    stage = "down";
+                    stageDiv.innerText = "Внизу!";
+                    stageDiv.style.color = "#ff3333";
+                    count++;
+                    counterDiv.innerText = count;
+                }
+            }
+            canvasCtx.restore();
+        }
+
+        // Инициализируем модель Pose от MediaPipe
+        const pose = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+        });
+
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: false,
+            smoothSegmentation: false,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        pose.onResults(onResults);
+
+        // Запускаем камеру и передаем поток в MediaPipe с гибкими настройками
+const camera = new Camera(videoElement, {
+    onFrame: async () => {
+        await pose.send({image: videoElement});
+    },
+    // Вместо жестких цифр просим браузер выбрать подходящее разрешение
+    width: { ideal: 640 },
+    height: { ideal: 480 }
+});
+
+// Добавляем обработку ошибок, чтобы понять, если что-то пойдет не так
+camera.start().catch(err => {
+    console.error("Ошибка запуска камеры: ", err);
+    alert("Не удалось запустить камеру. Проверь разрешения в браузере или попробуй открыть через Chrome/Yandex.");
+});
+    </script>
+</body>
+</html>
